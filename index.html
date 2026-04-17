@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformaciones 2D</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #0f172a;
+  color: white;
+}
+
+header {
+  text-align: center;
+  padding: 30px 20px 20px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+header h1 {
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #f1f5f9;
+}
+
+header p {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+section {
+  margin: 20px auto;
+  max-width: 700px;
+  padding: 24px;
+  background: #1e293b;
+  border-radius: 12px;
+  border: 1px solid #334155;
+}
+
+h2 {
+  color: #38bdf8;
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.desc {
+  color: #cbd5e1;
+  font-size: 14px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.formula {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 14px;
+  display: inline-block;
+  color: #7dd3fc;
+  margin-bottom: 16px;
+}
+
+.controles {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.controles label {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.controles input[type=range] {
+  width: 130px;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+.speed-val {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 32px;
+  color: #38bdf8;
+}
+
+button.ctrl-btn {
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #f1f5f9;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+button.ctrl-btn:hover { background: #334155; }
+
+button.ctrl-btn.pausado {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #bfdbfe;
+}
+
+canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #ffffff;
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+}
+
+.leyenda {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.leyenda span {
+  font-size: 12px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot-orig {
+  width: 14px; height: 3px;
+  background: #94a3b8;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.dot-trans {
+  width: 14px; height: 3px;
+  background: #ef4444;
+  border-radius: 2px;
+  display: inline-block;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Transformaciones en el Espacio Bidimensional</h1>
+  <p>Rotación · Traslación · Escalamiento · Sesgado</p>
+</header>
+
+<div id="contenedor"></div>
+
+<script>
+const transformaciones = [
+  {
+    id: "tras",
+    titulo: "Traslación",
+    desc: "Mueve una figura de un lugar a otro sin modificar su forma ni tamaño. Se realiza sumando valores constantes a las coordenadas de cada punto.",
+    formula: "(x, y) → (x + a·sin(t),  y + b·cos(t))",
+    fn: (p, t) => ({
+      x: p.x + Math.sin(t) * 2,
+      y: p.y + Math.cos(t)
+    })
+  },
+  {
+    id: "esc",
+    titulo: "Escalamiento",
+    desc: "Cambia el tamaño de la figura multiplicando sus coordenadas por un factor. Un factor mayor a 1 agranda; entre 0 y 1 reduce.",
+    formula: "(x, y) → (sx·x,  sy·y)",
+    fn: (p, t) => {
+      const s = 1 + Math.sin(t) * 0.5;
+      return { x: p.x * s, y: p.y * s };
+    }
+  },
+  {
+    id: "rot",
+    titulo: "Rotación",
+    desc: "Gira la figura alrededor del origen un ángulo θ. No altera el tamaño ni la forma, solo cambia la orientación.",
+    formula: "(x, y) → (x·cos θ − y·sin θ,  x·sin θ + y·cos θ)",
+    fn: (p, t) => ({
+      x: p.x * Math.cos(t) - p.y * Math.sin(t),
+      y: p.x * Math.sin(t) + p.y * Math.cos(t)
+    })
+  },
+  {
+    id: "ses",
+    titulo: "Sesgado (Shear)",
+    desc: "Inclina la figura desplazando sus puntos en una dirección mientras el otro eje permanece fijo. Genera efectos de perspectiva.",
+    formula: "(x, y) → (x + k·y,  y)",
+    fn: (p, t) => ({
+      x: p.x + Math.sin(t) * p.y,
+      y: p.y
+    })
+  }
+];
+
+const figura = [
+  {x: -1, y: -1},
+  {x:  1, y: -1},
+  {x:  1, y:  1},
+  {x: -1, y:  1}
+];
+
+const estados = {};
+const contenedor = document.getElementById("contenedor");
+
+transformaciones.forEach(tr => {
+  estados[tr.id] = { t: 0, paused: false, speed: 5, raf: null };
+
+  const sec = document.createElement("section");
+  sec.innerHTML = `
+    <h2>${tr.titulo}</h2>
+    <p class="desc">${tr.desc}</p>
+    <div class="formula">${tr.formula}</div>
+    <div class="controles">
+      <button class="ctrl-btn" id="btn-${tr.id}">⏸ Pausar</button>
+      <label>Velocidad:</label>
+      <input type="range" min="1" max="10" value="5" step="1" id="spd-${tr.id}" />
+      <span class="speed-val" id="spd-val-${tr.id}">5×</span>
+    </div>
+    <canvas id="${tr.id}" width="500" height="320"></canvas>
+    <div class="leyenda">
+      <span><span class="dot-orig"></span> Figura original</span>
+      <span><span class="dot-trans"></span> Figura transformada</span>
+    </div>
+  `;
+  contenedor.appendChild(sec);
+
+  const btn = document.getElementById(`btn-${tr.id}`);
+  const spd = document.getElementById(`spd-${tr.id}`);
+  const spdVal = document.getElementById(`spd-val-${tr.id}`);
+
+  btn.addEventListener("click", () => {
+    const st = estados[tr.id];
+    st.paused = !st.paused;
+    if (st.paused) {
+      btn.textContent = "▶ Reanudar";
+      btn.classList.add("pausado");
+    } else {
+      btn.textContent = "⏸ Pausar";
+      btn.classList.remove("pausado");
+      iniciarLoop(tr);
+    }
+  });
+
+  spd.addEventListener("input", () => {
+    estados[tr.id].speed = parseFloat(spd.value);
+    spdVal.textContent = spd.value + "×";
+  });
+
+  iniciarLoop(tr);
+});
+
+function iniciarLoop(tr) {
+  const st = estados[tr.id];
+  if (st.raf) cancelAnimationFrame(st.raf);
+
+  const canvas = document.getElementById(tr.id);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2;
+  const escala = 55;
+
+  function draw() {
+    if (st.paused) return;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, W, H);
+
+    // Cuadrícula
+    ctx.strokeStyle = "#f0f0f0";
+    ctx.lineWidth = 0.5;
+    for (let i = -10; i <= 10; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * escala, 0); ctx.lineTo(cx + i * escala, H); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, cy + i * escala); ctx.lineTo(W, cy + i * escala); ctx.stroke();
+    }
+
+    // Ejes
+    ctx.strokeStyle = "#b0b0b0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, cy); ctx.lineTo(W, cy);
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, H);
+    ctx.stroke();
+
+    // Flechas ejes
+    ctx.fillStyle = "#b0b0b0";
+    ctx.beginPath(); ctx.moveTo(W-6, cy-4); ctx.lineTo(W, cy); ctx.lineTo(W-6, cy+4); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx-4, 6);   ctx.lineTo(cx, 0);  ctx.lineTo(cx+4, 6);  ctx.fill();
+
+    // Figura original
+    dibFigura(ctx, figura, cx, cy, escala, "#9ca3af", "rgba(200,200,200,0.15)");
+
+    // Figura transformada
+    const nueva = figura.map(p => tr.fn(p, st.t));
+    dibFigura(ctx, nueva, cx, cy, escala, "#ef4444", "rgba(239,68,68,0.12)");
+
+    // Vértices
+    nueva.forEach(p => {
+      ctx.fillStyle = "#3b82f6";
+      ctx.beginPath();
+      ctx.arc(cx + p.x * escala, cy - p.y * escala, 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    st.t += 0.015 * st.speed;
+    st.raf = requestAnimationFrame(draw);
+  }
+
+  draw();
+}
+
+function dibFigura(ctx, pts, cx, cy, escala, color, fill) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = fill;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  pts.forEach((p, i) => {
+    const x = cx + p.x * escala;
+    const y = cy - p.y * escala;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+</script>
+
+</body>
+</html>
